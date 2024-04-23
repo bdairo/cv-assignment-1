@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dimension Calculation</title>
+</head>
+<body>
+    <h1>Dimension Calculation</h1>
+    
+    <div id="image-div">
+        <label for="object-image">Upload Image of Object:</label>
+        <input type="file" id="object-image" name="image" onchange="loadImage()">
+        <br>
+        <canvas id="image-canvas" style="border:1px solid black;"></canvas>
+        <br>
+        <label for="distance">Distance to Object (mm):</label>
+        <input type="text" id="distance" name="distance">
+        <br>
+        <input  id="point1" name="point1">
+        <input  id="point2" name="point2">
+        <button type="button" id="calculate-btn">Calculate Dimensions</button>
+        <p id="result">Dimension: </p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('image-canvas');
+        const ctx = canvas.getContext('2d');
+        const points = [];
+
+        function loadImage() {
+            const fileInput = document.getElementById('object-image');
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            }
+        }
+
+        canvas.addEventListener('click', function(event) {
+            if (points.length > 2) {
+                alert('Only two points can be selected');
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            points.push({ x: x, y: y });
+
+            // Draw a circle or marker at the clicked position
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Update hidden form fields
+            if (points.length == 1) {
+                document.getElementById('point1').value = `${x},${y}`;
+            } else if (points.length == 2) {
+                document.getElementById('point2').value = `${x},${y}`;
+            }
+        });
+
+        document.getElementById('calculate-btn').addEventListener('click', function() {
+        const distance = document.getElementById('distance').value;
+        const point1 = document.getElementById('point1').value;
+        const point2 = document.getElementById('point2').value;
+
+        if (!distance || !point1 || !point2) {
+            alert('Please fill in all fields and select two points.');
+            return;
+        }
+
+        // Prepare data to send to the server
+        const data = {
+            distance: distance,
+            point1: point1,
+            point2: point2,
+            image: document.getElementById('object-image').files[0]
+        };
+
+        // Use FormData to handle file upload in AJAX
+        const formData = new FormData();
+        formData.append('distance', data.distance);
+        formData.append('point1', data.point1);
+        formData.append('point2', data.point2);
+        formData.append('image', data.image);
+
+        // Perform AJAX request to Flask backend
+        fetch('/calculate-dimensions', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json())
+        .then(data => {
+            console.log('data is:', data)
+            document.getElementById('result').innerHTML = `Dimension: ${data.calculated_diameter} mm`;
+        }).catch(error => {
+            console.error('Error:', error);
+        });
+    });
+
+    </script>
+</body>
+</html>
